@@ -1,44 +1,47 @@
-name: Build APK
+name: Build Android APK
 on: [push]
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true # حل مشكلة Node.js 24
+    runs-on: ubuntu-22.04 # نسخة مستقرة جداً
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11' # إصدار أحدث وأكثر استقراراً
+          python-version: '3.11'
 
-      - name: Install Dependencies
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Install Buildozer dependencies
         run: |
           sudo apt update
-          sudo apt install -y git zip unzip autoconf automake libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev
+          sudo apt install -y git zip unzip autoconf automake libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev python3-dev
           pip install --upgrade pip
           pip install --upgrade buildozer cython virtualenv
 
-      - name: Prepare Buildozer
+      - name: Create or Update Buildozer Spec
         run: |
-          export PATH=$PATH:$HOME/.local/bin
-          # إذا لم يكن هناك ملف إعدادات، سنصنع واحداً فوراً
           if [ ! -f buildozer.spec ]; then
             buildozer init
-            # تعديل بسيط لضمان قبول الشروط تلقائياً
-            sed -i 's/# android.accept_sdk_license = False/android.accept_sdk_license = True/' buildozer.spec
           fi
+          # هذه الأسطر تعدل الملف ليعمل مع Pygame وتوافق على التراخيص تلقائياً
+          sed -i 's/# android.accept_sdk_license = False/android.accept_sdk_license = True/' buildozer.spec
+          sed -i 's/requirements = python3,kivy/requirements = python3,pygame,kivy/' buildozer.spec
 
-      - name: Build with Buildozer
+      - name: Build APK with Buildozer
         run: |
           export PATH=$PATH:$HOME/.local/bin
-          # بناء التطبيق مع تخطي الأسئلة التفاعلية
+          # استخدام 'yes' لإجابة كل أسئلة الأندرويد بـ نعم
           yes | buildozer android debug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: game-release-apk
+          name: MyGame-Package
           path: bin/*.apk
