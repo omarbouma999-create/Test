@@ -4,30 +4,41 @@ on: [push]
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true # حل مشكلة Node.js 24
     steps:
-      - uses: actions/checkout@v4  # تم التحديث لـ v4
+      - uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5 # تم التحديث لـ v5
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11' # إصدار أحدث وأكثر استقراراً
 
-      - name: Install Buildozer dependencies
+      - name: Install Dependencies
         run: |
           sudo apt update
           sudo apt install -y git zip unzip autoconf automake libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev
+          pip install --upgrade pip
           pip install --upgrade buildozer cython virtualenv
+
+      - name: Prepare Buildozer
+        run: |
+          export PATH=$PATH:$HOME/.local/bin
+          # إذا لم يكن هناك ملف إعدادات، سنصنع واحداً فوراً
+          if [ ! -f buildozer.spec ]; then
+            buildozer init
+            # تعديل بسيط لضمان قبول الشروط تلقائياً
+            sed -i 's/# android.accept_sdk_license = False/android.accept_sdk_license = True/' buildozer.spec
+          fi
 
       - name: Build with Buildozer
         run: |
           export PATH=$PATH:$HOME/.local/bin
-          # إذا لم يكن الملف موجوداً، سيقوم بإنشائه
-          if [ ! -f buildozer.spec ]; then buildozer init; fi
-          # بناء التطبيق
-          buildozer android debug
+          # بناء التطبيق مع تخطي الأسئلة التفاعلية
+          yes | buildozer android debug
 
       - name: Upload APK
-        uses: actions/upload-artifact@v4 # هذا هو الإصلاح الأهم (v4)
+        uses: actions/upload-artifact@v4
         with:
-          name: my-game-app
+          name: game-release-apk
           path: bin/*.apk
